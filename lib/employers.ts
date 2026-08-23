@@ -1,3 +1,18 @@
+export type ShortlistedAssistant = {
+  id: number;
+  name: string | null;
+  mobile: string;
+  email: string | null;
+  city: string | null;
+  area: string | null;
+  pincode: number | null;
+  gender: string | null;
+  age: number | null;
+  status: string;
+  profilePictureUrl: string | null;
+  shortlistedAt: string;
+};
+
 export type Employer = {
   id: number;
   email: string | null;

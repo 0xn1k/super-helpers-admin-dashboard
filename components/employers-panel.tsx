@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Mail, MessageCircle, Phone, RefreshCcw, Search, Send, Users } from "lucide-react";
-import type { Employer } from "@/lib/employers";
+import Image from "next/image";
+import { Mail, MessageCircle, Phone, RefreshCcw, Search, Send, Users, X } from "lucide-react";
+import type { Employer, ShortlistedAssistant } from "@/lib/employers";
 import {
   defaultCustomEmployerMessage,
   employerMessagePresets,
@@ -19,6 +20,12 @@ type EmployersResponse = {
   resultCount: number;
 };
 
+type ShortlistedAssistantsResponse = {
+  status: number;
+  message: string;
+  data: ShortlistedAssistant[];
+};
+
 export function EmployersPanel() {
   const [items, setItems] = useState<Employer[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -29,6 +36,10 @@ export function EmployersPanel() {
   const [customMessage, setCustomMessage] = useState(defaultCustomEmployerMessage);
   const [drafts, setDrafts] = useState<Record<number, string>>({});
   const [sentMessages, setSentMessages] = useState<Record<number, string>>({});
+  const [shortlistModalEmployer, setShortlistModalEmployer] = useState<Employer | null>(null);
+  const [shortlistedAssistants, setShortlistedAssistants] = useState<ShortlistedAssistant[]>([]);
+  const [shortlistModalLoading, setShortlistModalLoading] = useState(false);
+  const [shortlistModalError, setShortlistModalError] = useState<string | null>(null);
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams();
@@ -98,6 +109,34 @@ export function EmployersPanel() {
     const next = { ...sentMessages, [employerId]: sentMessage };
     setSentMessages(next);
     localStorage.setItem("superhelper-employer-whatsapp-messages", JSON.stringify(next));
+  }
+
+  async function openShortlistModal(employer: Employer) {
+    setShortlistModalEmployer(employer);
+    setShortlistedAssistants([]);
+    setShortlistModalError(null);
+    setShortlistModalLoading(true);
+
+    const response = await fetch(`/api/admin/employers/${employer.id}/shortlisted-assistants`, {
+      cache: "no-store",
+    });
+    const result = (await response.json().catch(() => null)) as ShortlistedAssistantsResponse | null;
+
+    setShortlistModalLoading(false);
+
+    if (!response.ok) {
+      setShortlistModalError(result?.message ?? "Unable to load shortlisted assistants");
+      return;
+    }
+
+    setShortlistedAssistants(result?.data ?? []);
+  }
+
+  function closeShortlistModal() {
+    setShortlistModalEmployer(null);
+    setShortlistedAssistants([]);
+    setShortlistModalError(null);
+    setShortlistModalLoading(false);
   }
 
   return (
@@ -220,7 +259,18 @@ export function EmployersPanel() {
                   <div className="lead-secondary">
                     <span>{item.contactCount} contacts</span>
                     <small>
-                      {item.shortlistCount} shortlisted · {item.reviewCount} reviews · {item.chatCount} chats
+                      {item.shortlistCount > 0 ? (
+                        <button
+                          className="shortlist-link"
+                          type="button"
+                          onClick={() => openShortlistModal(item)}
+                        >
+                          {item.shortlistCount} shortlisted
+                        </button>
+                      ) : (
+                        <span>{item.shortlistCount} shortlisted</span>
+                      )}{" "}
+                      · {item.reviewCount} reviews · {item.chatCount} chats
                     </small>
                   </div>
                 </td>
@@ -255,6 +305,82 @@ export function EmployersPanel() {
           </tbody>
         </table>
       </section>
+
+      {shortlistModalEmployer ? (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={closeShortlistModal}>
+          <div className="order-modal shortlist-modal" onClick={(event) => event.stopPropagation()}>
+            <header className="modal-header">
+              <div>
+                <p className="eyebrow">Shortlisted profiles</p>
+                <h2>{shortlistModalEmployer.name || shortlistModalEmployer.email || "Employer"}</h2>
+              </div>
+              <button className="secondary-button inline-button" type="button" onClick={closeShortlistModal}>
+                <X size={17} />
+                Close
+              </button>
+            </header>
+
+            {shortlistModalLoading ? <p>Loading shortlisted profiles...</p> : null}
+            {shortlistModalError ? <p className="form-message">{shortlistModalError}</p> : null}
+            {!shortlistModalLoading && !shortlistModalError && shortlistedAssistants.length === 0 ? (
+              <p>No shortlisted profiles for this employer.</p>
+            ) : null}
+
+            {shortlistedAssistants.length > 0 ? (
+              <div className="shortlist-grid">
+                {shortlistedAssistants.map((assistant) => (
+                  <article className="shortlist-card" key={assistant.id}>
+                    {assistant.profilePictureUrl ? (
+                      <Image
+                        className="shortlist-avatar"
+                        src={assistant.profilePictureUrl}
+                        alt={assistant.name ?? "Assistant profile"}
+                        width={56}
+                        height={56}
+                        unoptimized
+                      />
+                    ) : (
+                      <div className="shortlist-avatar shortlist-avatar--placeholder" aria-hidden="true">
+                        {(assistant.name ?? "?").slice(0, 1).toUpperCase()}
+                      </div>
+                    )}
+                    <div className="shortlist-card-body">
+                      <strong>{assistant.name || "Unnamed assistant"}</strong>
+                      <span className={`assistant-status assistant-status--${assistant.status.toLowerCase()}`}>
+                        {assistant.status}
+                      </span>
+                      <div className="shortlist-card-meta">
+                        <a href={`tel:${assistant.mobile}`}>
+                          <Phone size={13} />
+                          {assistant.mobile}
+                        </a>
+                        {assistant.email ? (
+                          <a href={`mailto:${assistant.email}`}>
+                            <Mail size={13} />
+                            {assistant.email}
+                          </a>
+                        ) : null}
+                        <small>
+                          {[assistant.area, assistant.city].filter(Boolean).join(", ") || "Location not set"}
+                        </small>
+                        <small>
+                          {[
+                            assistant.gender,
+                            assistant.age ? `${assistant.age} yrs` : null,
+                          ]
+                            .filter(Boolean)
+                            .join(" · ") || "Details not set"}
+                        </small>
+                        <small>Shortlisted on {formatDate(assistant.shortlistedAt)}</small>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
