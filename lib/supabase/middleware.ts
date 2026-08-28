@@ -2,6 +2,11 @@ import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient, type SetAllCookies } from "@supabase/ssr";
 import { getSupabaseServerAuthEnv } from "@/lib/env";
 
+// Never let the session-refresh network call hang longer than this.
+// Vercel kills middleware after ~25s with MIDDLEWARE_INVOCATION_TIMEOUT,
+// which takes the whole site down with a 504.
+const SUPABASE_AUTH_TIMEOUT_MS = 2500;
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
@@ -12,6 +17,16 @@ export async function updateSession(request: NextRequest) {
   try {
     supabaseAuthEnv = getSupabaseServerAuthEnv();
   } catch {
+    return supabaseResponse;
+  }
+
+  // Skip the network round-trip entirely when there is no session to refresh.
+  // Actual authorization is enforced per-page by requireAdmin().
+  const hasAuthCookie = request.cookies
+    .getAll()
+    .some(({ name }) => name.startsWith("sb-") && name.includes("auth-token"));
+
+  if (!hasAuthCookie) {
     return supabaseResponse;
   }
 
@@ -32,7 +47,19 @@ export async function updateSession(request: NextRequest) {
     },
   });
 
-  await supabase.auth.getUser();
+  try {
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeout = setTimeout(() => reject(new Error("Supabase auth timed out")), SUPABASE_AUTH_TIMEOUT_MS);
+    });
+
+    await Promise.race([supabase.auth.getUser(), timeoutPromise]).finally(() => {
+      clearTimeout(timeout);
+    });
+  } catch {
+    // Fail open: a slow/unreachable Supabase must not take the site down.
+    // If the session is actually invalid, requireAdmin() redirects to /login.
+  }
 
   return supabaseResponse;
 }
