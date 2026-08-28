@@ -33,6 +33,8 @@ ADMIN_EMAILS=
 DATABASE_URL=
 ```
 
+
+
 `SUPABASE_SERVICE_ROLE_KEY` must only be used server-side. Do not prefix it with `NEXT_PUBLIC_`, do not import it into client components, and do not commit `.env` or `.env.local`.
 
 3. Start the app:
