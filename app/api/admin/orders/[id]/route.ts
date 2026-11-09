@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
 import { getCurrentAdmin } from "@/lib/auth";
 import {
   calculateOrderAmounts,
@@ -109,6 +108,25 @@ export async function PUT(request: Request, { params }: Params) {
       return NextResponse.json({ status: 0, message: "Amounts must be non-negative numbers" }, { status: 400 });
     }
 
+    const employerId = order?.employee_id ?? payment?.employer_id ?? null;
+
+    if (!employerId) {
+      return NextResponse.json({ status: 0, message: "Order has no employer to bill" }, { status: 400 });
+    }
+
+    const employer = await prisma.employee.findUnique({ where: { id: employerId } });
+
+    if (!employer) {
+      return NextResponse.json({ status: 0, message: "Employer not found" }, { status: 404 });
+    }
+
+    if (!payment && !payload.paymentExpiryDate) {
+      return NextResponse.json(
+        { status: 0, message: "Payment expiry date is required to generate payment" },
+        { status: 400 },
+      );
+    }
+
     const metadata = {
       admin_notes: payload.metadataNotes,
       manual_discount: payload.discountAmount,
@@ -151,10 +169,31 @@ export async function PUT(request: Request, { params }: Params) {
               updated_at: new Date(),
             },
           })
-        : prisma.paymentDetails.findUnique({ where: { payment_order_id: orderKey } }),
+        : prisma.paymentDetails.create({
+            data: {
+              payment_order_id: orderKey,
+              employer_id: employerId,
+              payment_status: payload.paymentStatus,
+              original_payment_price: payload.originalPaymentPrice,
+              package_id: requestedPackageId,
+              payment_type: payload.paymentType,
+              payment_gst: payload.paymentGst,
+              payment_total_ammount: payload.paymentTotalAmount,
+              payment_ammount_without_gst: payload.paymentAmountWithoutGst,
+              payment_ammount_with_offer: payload.paymentAmountWithOffer,
+              offer_taken: payload.discountAmount,
+              payment_ammount: payload.paymentAmount,
+              is_replacement_activate: payload.isReplacementActivate,
+              contact_take: payload.contactTake,
+              payment_initated_date: payload.paymentInitiatedDate,
+              payment_expiry_date: payload.paymentExpiryDate,
+              metadata,
+              employer_mobile: employer.mobile,
+              created_at: new Date(),
+              updated_at: new Date(),
+            },
+          }),
     ]);
-    const employerId = updatedOrder?.employee_id ?? updatedPayment?.employer_id ?? null;
-    const employer = employerId ? await prisma.employee.findUnique({ where: { id: employerId } }) : null;
 
     return NextResponse.json({
       status: 1,
@@ -166,11 +205,13 @@ export async function PUT(request: Request, { params }: Params) {
       }),
     });
   } catch (error) {
+    console.error("Unable to update order", orderKey, error);
+
     return NextResponse.json(
       {
         status: 0,
         message: "Unable to update order",
-        error: error instanceof Prisma.PrismaClientKnownRequestError ? error.message : "Unknown Prisma error",
+        error: error instanceof Error ? error.message : "Unknown Prisma error",
       },
       { status: 500 },
     );
