@@ -8,71 +8,79 @@ datasource db {
 }
 
 model Employee {
-  id         Int       @id @default(autoincrement())
+  id         Int      @id @default(autoincrement())
   email      String?
-  name       String?
-  mobile     String?
-  created_at DateTime?
+  name       String
+  mobile     String   @unique
+  created_at DateTime @default(now())
 
   @@map("employee")
 }
 
 model ServicePackage {
-  id                     Int       @id @default(autoincrement())
+  id                     Int      @id @default(autoincrement())
   package_name           String
-  package_price          Decimal
-  package_gst_percentage Decimal
-  package_validity_days  Int?
-  package_active         Boolean?
-  package_created_at     DateTime?
-  package_updated_at     DateTime?
+  package_price          Float
+  package_gst_percentage Float
+  package_validity_days  Int
+  package_active         Boolean  @default(true)
+  package_created_at     DateTime @default(now())
 
   @@map("servicePackage")
 }
 
 model OrderGenerated {
-  id                       Int       @id @default(autoincrement())
-  order_id                 String    @unique
-  employee_id              Int?
-  order_package_id         Int?
-  order_package_name       String?
-  order_package_price      Decimal?
-  order_package_gst        Decimal?
-  order_package_created_at DateTime?
+  id                       Int      @id @default(autoincrement())
+  order_id                 String   @unique
+  employee_id              Int
+  order_package_id         Int
+  order_package_name       String
+  order_package_price      Float
+  order_package_gst        Float
+  order_package_created_at DateTime @default(now())
   coupon_used              String?
-  refferal_point           Decimal?
-  value_of_id              Decimal?
+  refferal_point           Int?
+  value_of_id              Int?
 
   @@map("orderGenerated")
 }
 
 model PaymentDetails {
-  id                          Int       @id @default(autoincrement())
-  payment_order_id            String    @unique
-  employer_id                 Int?
-  payment_status              String?
-  original_payment_price      Decimal?
-  package_id                  Int?
-  payment_type                String?
-  payment_gst                 Decimal?
-  payment_total_ammount       Decimal?
-  payment_ammount_without_gst Decimal?
-  payment_ammount_with_offer  Decimal?
-  offer_taken                 Decimal?
-  payment_ammount             Decimal?
-  is_replacement_activate     Boolean?
-  contact_take                Decimal?
-  payment_initated_date       DateTime?
-  payment_expiry_date         DateTime?
-  metadata                    Json?
-  employer_mobile             String?
+  id                          Int      @id @default(autoincrement())
+  payment_order_id            String   @unique
+  employer_id                 Int
+  payment_status              String
+  original_payment_price      Float
+  package_id                  Int      @default(0)
+  payment_type                String
+  payment_gst                 Float
+  payment_total_ammount       Float
+  payment_ammount_without_gst Float
+  payment_ammount_with_offer  Float
+  offer_taken                 Int?
+  payment_ammount             Float
+  is_replacement_activate     Boolean  @default(false)
+  contact_take                Int      @default(0)
+  payment_initated_date       DateTime
+  payment_expiry_date         DateTime
+  created_at                  DateTime @default(now())
+  updated_at                  DateTime @updatedAt
   rzp_payment_id              String?
   rzp_order_id                String?
   rzp_signature               String?
+  rzp_entity                  String?
+  rzp_ammount_in_paisa        Int?
+  rzp_currency                String?
   rzp_status                  String?
   rzp_method                  String?
-  created_at                  DateTime?
-  updated_at                  DateTime?
+  rzp_payment_description     String?
+  rzp_notes                   String?
+  rzp_fees_in_paisa           Int?
+  rzp_tax_in_paisa            Int?
+  rzp_acquirer_data           String?
+  rzp_created_at              String?
+  metadata                    String?
+  employer_mobile             String?
 
   @@map("paymentDetails")
 }

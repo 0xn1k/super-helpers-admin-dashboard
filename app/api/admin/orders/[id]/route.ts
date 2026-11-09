@@ -120,18 +120,20 @@ export async function PUT(request: Request, { params }: Params) {
       return NextResponse.json({ status: 0, message: "Employer not found" }, { status: 404 });
     }
 
-    if (!payment && !payload.paymentExpiryDate) {
+    const metadata = JSON.stringify({
+      admin_notes: payload.metadataNotes,
+      manual_discount: payload.discountAmount,
+      updated_by_admin: admin.email,
+    });
+    const paymentExpiryDate = payload.paymentExpiryDate ?? payment?.payment_expiry_date ?? null;
+
+    if (!paymentExpiryDate) {
       return NextResponse.json(
         { status: 0, message: "Payment expiry date is required to generate payment" },
         { status: 400 },
       );
     }
 
-    const metadata = {
-      admin_notes: payload.metadataNotes,
-      manual_discount: payload.discountAmount,
-      updated_by_admin: admin.email,
-    };
     const [updatedOrder, updatedPayment] = await prisma.$transaction([
       order
         ? prisma.orderGenerated.update({
@@ -142,8 +144,8 @@ export async function PUT(request: Request, { params }: Params) {
               order_package_price: payload.basePrice,
               order_package_gst: payload.gstPercentage,
               coupon_used: payload.couponUsed,
-              refferal_point: payload.referralPoint,
-              value_of_id: payload.discountAmount,
+              refferal_point: Math.round(payload.referralPoint),
+              value_of_id: Math.round(payload.discountAmount),
             },
           })
         : prisma.orderGenerated.findUnique({ where: { order_id: orderKey } }),
@@ -159,12 +161,12 @@ export async function PUT(request: Request, { params }: Params) {
               payment_total_ammount: payload.paymentTotalAmount,
               payment_ammount_without_gst: payload.paymentAmountWithoutGst,
               payment_ammount_with_offer: payload.paymentAmountWithOffer,
-              offer_taken: payload.discountAmount,
+              offer_taken: Math.round(payload.discountAmount),
               payment_ammount: payload.paymentAmount,
               is_replacement_activate: payload.isReplacementActivate,
-              contact_take: payload.contactTake,
+              contact_take: Math.round(payload.contactTake),
               payment_initated_date: payload.paymentInitiatedDate,
-              payment_expiry_date: payload.paymentExpiryDate,
+              payment_expiry_date: paymentExpiryDate,
               metadata,
               updated_at: new Date(),
             },
@@ -181,12 +183,12 @@ export async function PUT(request: Request, { params }: Params) {
               payment_total_ammount: payload.paymentTotalAmount,
               payment_ammount_without_gst: payload.paymentAmountWithoutGst,
               payment_ammount_with_offer: payload.paymentAmountWithOffer,
-              offer_taken: payload.discountAmount,
+              offer_taken: Math.round(payload.discountAmount),
               payment_ammount: payload.paymentAmount,
               is_replacement_activate: payload.isReplacementActivate,
-              contact_take: payload.contactTake,
+              contact_take: Math.round(payload.contactTake),
               payment_initated_date: payload.paymentInitiatedDate,
-              payment_expiry_date: payload.paymentExpiryDate,
+              payment_expiry_date: paymentExpiryDate,
               metadata,
               employer_mobile: employer.mobile,
               created_at: new Date(),
@@ -263,7 +265,7 @@ function buildOrderPayload(body: Record<string, unknown>, packageItem: OrderPack
     discountAmount,
     paymentStatus: toOptionalString(body.paymentStatus) ?? "PENDING",
     originalPaymentPrice,
-    paymentType: toOptionalString(body.paymentType),
+    paymentType: toOptionalString(body.paymentType) ?? "ADMIN",
     paymentGst,
     paymentTotalAmount,
     paymentAmountWithoutGst,

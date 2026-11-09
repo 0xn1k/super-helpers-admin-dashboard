@@ -134,12 +134,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ status: 0, message: "Amounts must be non-negative numbers" }, { status: 400 });
     }
 
+    if (!payload.paymentExpiryDate) {
+      return NextResponse.json({ status: 0, message: "Payment expiry date is required" }, { status: 400 });
+    }
+
     const orderId = generateOrderId();
-    const metadata = {
+    const metadata = JSON.stringify({
       admin_notes: payload.metadataNotes,
       manual_discount: payload.discountAmount,
       created_by_admin: admin.email,
-    };
+    });
     const [order, payment] = await prisma.$transaction([
       prisma.orderGenerated.create({
         data: {
@@ -151,8 +155,8 @@ export async function POST(request: Request) {
           order_package_gst: payload.gstPercentage,
           order_package_created_at: new Date(),
           coupon_used: payload.couponUsed,
-          refferal_point: payload.referralPoint,
-          value_of_id: payload.discountAmount,
+          refferal_point: Math.round(payload.referralPoint),
+          value_of_id: Math.round(payload.discountAmount),
         },
       }),
       prisma.paymentDetails.create({
@@ -167,10 +171,10 @@ export async function POST(request: Request) {
           payment_total_ammount: payload.paymentTotalAmount,
           payment_ammount_without_gst: payload.paymentAmountWithoutGst,
           payment_ammount_with_offer: payload.paymentAmountWithOffer,
-          offer_taken: payload.discountAmount,
+          offer_taken: Math.round(payload.discountAmount),
           payment_ammount: payload.paymentAmount,
           is_replacement_activate: payload.isReplacementActivate,
-          contact_take: payload.contactTake,
+          contact_take: Math.round(payload.contactTake),
           payment_initated_date: payload.paymentInitiatedDate,
           payment_expiry_date: payload.paymentExpiryDate,
           metadata,
@@ -344,7 +348,7 @@ function buildOrderPayload(body: Record<string, unknown>, packageItem: OrderPack
     discountAmount,
     paymentStatus: toOptionalString(body.paymentStatus) ?? "PENDING",
     originalPaymentPrice,
-    paymentType: toOptionalString(body.paymentType),
+    paymentType: toOptionalString(body.paymentType) ?? "ADMIN",
     paymentGst,
     paymentTotalAmount,
     paymentAmountWithoutGst,

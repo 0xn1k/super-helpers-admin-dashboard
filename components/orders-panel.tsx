@@ -377,6 +377,7 @@ export function OrdersPanel() {
           isSaving={isSaving}
           packages={packages}
           paymentStatuses={visibleStatuses}
+          requireExpiry
           submitLabel="Create order"
           title="Create Order"
           onChange={setForm}
@@ -881,12 +882,22 @@ function recalculateFromTotal(form: OrderForm) {
 }
 
 function metadataNotes(metadata: unknown) {
-  if (metadata && typeof metadata === "object" && "admin_notes" in metadata) {
-    const value = (metadata as { admin_notes?: unknown }).admin_notes;
+  const parsed = typeof metadata === "string" ? safeJsonParse(metadata) : metadata;
+
+  if (parsed && typeof parsed === "object" && "admin_notes" in parsed) {
+    const value = (parsed as { admin_notes?: unknown }).admin_notes;
     return typeof value === "string" ? value : "";
   }
 
   return "";
+}
+
+function safeJsonParse(value: string): unknown {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
 }
 
 function formatDate(value: string | null) {
