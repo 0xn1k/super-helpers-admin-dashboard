@@ -405,7 +405,9 @@ export function OrdersPanel() {
               packages={packages}
               paymentStatuses={visibleStatuses}
               provider={editingOrder.provider}
-              submitLabel="Save changes"
+              requireExpiry
+              statusOptions={["PENDING", "DONE"]}
+              submitLabel="Generate Payment"
               title="Editable Details"
               onChange={setEditForm}
               onPackageChange={(packageId) => {
@@ -431,6 +433,8 @@ function OrderFormView({
   packages,
   paymentStatuses,
   provider,
+  requireExpiry,
+  statusOptions,
   submitLabel,
   title,
   onChange,
@@ -443,6 +447,8 @@ function OrderFormView({
   packages: OrderPackageOption[];
   paymentStatuses: string[];
   provider?: AdminOrder["provider"];
+  requireExpiry?: boolean;
+  statusOptions?: string[];
   submitLabel: string;
   title: string;
   onChange: (form: OrderForm) => void;
@@ -524,17 +530,34 @@ function OrderFormView({
 
         <label className="field">
           Payment status
-          <input
-            list="payment-statuses"
-            required
-            value={form.paymentStatus}
-            onChange={(event) => updateField("paymentStatus", event.target.value)}
-          />
-          <datalist id="payment-statuses">
-            {paymentStatuses.map((status) => (
-              <option key={status} value={status} />
-            ))}
-          </datalist>
+          {statusOptions ? (
+            <select
+              required
+              value={form.paymentStatus}
+              onChange={(event) => updateField("paymentStatus", event.target.value)}
+            >
+              <option value="">Select status</option>
+              {Array.from(new Set([...statusOptions, form.paymentStatus].filter(Boolean))).map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <>
+              <input
+                list="payment-statuses"
+                required
+                value={form.paymentStatus}
+                onChange={(event) => updateField("paymentStatus", event.target.value)}
+              />
+              <datalist id="payment-statuses">
+                {paymentStatuses.map((status) => (
+                  <option key={status} value={status} />
+                ))}
+              </datalist>
+            </>
+          )}
         </label>
 
         <label className="field">
@@ -658,6 +681,7 @@ function OrderFormView({
         <label className="field">
           Payment expiry
           <input
+            required={requireExpiry}
             type="datetime-local"
             value={form.paymentExpiryDate}
             onChange={(event) => updateField("paymentExpiryDate", event.target.value)}
